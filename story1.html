@@ -1,1 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>音乐播放器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* 背景图片设置 - 你可以在这里替换图片URL */
+            background-image: url('images/1背景.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            /* 背景图片透明度80% - 通过伪元素实现 */
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 背景遮罩层，实现80%透明度效果 */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.2); /* 20%白色覆盖 = 80%图片可见 */
+            z-index: 0;
+        }
+
+        /* 播放器容器 - 玻璃拟态半透明效果 */
+        .player-container {
+            position: relative;
+            z-index: 1;
+            width: 90%;
+            max-width: 320px;
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* 暗色模式支持 */
+        @media (prefers-color-scheme: dark) {
+            .player-container {
+                background: rgba(30, 30, 30, 0.75);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        /* 顶部信息区域 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+        }
+
+        .song-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .music-icon {
+            width: 24px;
+            height: 24px;
+            color: #f59e0b;
+            flex-shrink: 0;
+        }
+
+        .text-info h3 {
+            font-size: 17px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 2px;
+        }
+
+        .text-info p {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .text-info h3 {
+                color: #e5e7eb;
+            }
+            .text-info p {
+                color: #9ca3af;
+            }
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            transition: transform 0.2s;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.9);
+        }
+
+        .heart-icon {
+            width: 24px;
+            height: 24px;
+            color: #ef4444;
+        }
+
+        .star-icon {
+            width: 24px;
+            height: 24px;
+            color: #6b7280;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .star-icon {
+                color: #9ca3af;
+            }
+        }
+
+        /* 封面图区域 */
+        .cover-area {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .cover-placeholder {
+            width: 60%;
+            height: 60%;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.1));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+        }
+
+        .cover-icon {
+            width: 48px;
+            height: 48px;
+            color: #f59e0b;
+            opacity: 0.6;
+        }
+
+        /* 控制区域 */
+        .controls {
+            padding: 20px 24px;
+        }
+
+        .progress-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .volume-icon {
+            width: 20px;
+            height: 20px;
+            color: #6b7280;
+            flex-shrink: 0;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .volume-icon {
+                color: #9ca3af;
+            }
+        }
+
+        /* 进度条容器 */
+        .progress-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            cursor: pointer;
+            position: relative;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .progress-bar {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #f59e0b;
+            width: 0%;
+            transition: width 0.1s linear;
+            border-radius: 2px;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #6b7280;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .progress-text {
+                color: #9ca3af;
+            }
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .time-display {
+                color: #9ca3af;
+            }
+        }
+
+        /* 播放控制按钮 */
+        .playback-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 16px;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.5);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .control-btn {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .play-btn {
+            width: 56px;
+            height: 56px;
+            background: #f59e0b;
+            color: white;
+        }
+
+        .play-btn:active {
+            background: #d97706;
+        }
+
+        .secondary-btn {
+            width: 40px;
+            height: 40px;
+            color: #4b5563;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .secondary-btn {
+                color: #d1d5db;
+            }
+        }
+
+        .control-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .play-icon {
+            width: 28px;
+            height: 28px;
+            margin-left: 2px;
+        }
+
+        /* 循环和定时控制 */
+        .extra-controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .extra-controls {
+                border-top-color: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        .extra-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.05);
+            border: none;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .extra-btn {
+                background: rgba(255, 255, 255, 0.1);
+                color: #9ca3af;
+            }
+        }
+
+        .extra-btn.active {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .extra-btn:active {
+            transform: scale(0.95);
+        }
+
+        .extra-icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* 定时器弹窗 */
+        .timer-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .timer-modal.show {
+            display: flex;
+        }
+
+        .timer-content {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 24px;
+            border-radius: 16px;
+            width: 80%;
+            max-width: 280px;
+            text-align: center;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .timer-content {
+                background: rgba(30, 30, 30, 0.95);
+            }
+        }
+
+        .timer-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1f2937;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .timer-title {
+                color: #e5e7eb;
+            }
+        }
+
+        .timer-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .timer-option {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.05);
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #4b5563;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .timer-option {
+                background: rgba(255, 255, 255, 0.1);
+                color: #d1d5db;
+            }
+        }
+
+        .timer-option:active {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .timer-close {
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            font-size: 14px;
+            color: #6b7280;
+            cursor: pointer;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .timer-close {
+                border-color: rgba(255, 255, 255, 0.2);
+                color: #9ca3af;
+            }
+        }
+
+        /* 倒计时显示 */
+        .countdown-display {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(245, 158, 11, 0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .countdown-display.show {
+            display: block;
+        }
+
+        /* iPhone安全区域适配 */
+        @supports (padding-top: env(safe-area-inset-top)) {
+            .player-container {
+                margin-top: env(safe-area-inset-top);
+                margin-bottom: env(safe-area-inset-bottom);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="player-container">
+        <!-- 倒计时显示 -->
+        <div class="countdown-display" id="countdownDisplay"></div>
+
+        <!-- 顶部信息 -->
+        <div class="header">
+            <div class="song-info">
+                <svg class="music-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13"></path>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <circle cx="18" cy="16" r="3"></circle>
+                </svg>
+                <div class="text-info">
+                    <h3 id="songTitle">歌曲标题</h3>
+                    <p id="artistName">艺术家名称</p>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="icon-btn" onclick="toggleLike()">
+                    <svg class="heart-icon" id="heartIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>
+                    </svg>
+                </button>
+                <button class="icon-btn">
+                    <svg class="star-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 封面区域 -->
+        <div class="cover-area">
+            <div class="cover-placeholder">
+                <svg class="cover-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13"></path>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <circle cx="18" cy="16" r="3"></circle>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 控制区域 -->
+        <div class="controls">
+            <!-- 进度条 -->
+            <div class="progress-section">
+                <svg class="volume-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                </svg>
+                <div class="progress-wrapper">
+                    <div class="progress-bar" id="progressBar" onclick="seek(event)">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+                <span class="progress-text" id="progressText">0%</span>
+            </div>
+
+            <!-- 时间显示 -->
+            <div class="time-display">
+                <span id="currentTime">00:00</span>
+                <span id="duration">00:00</span>
+            </div>
+
+            <!-- 播放控制 -->
+            <div class="playback-controls">
+                <button class="control-btn secondary-btn" onclick="skipBackward()">
+                    <svg class="control-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                        <line x1="5" y1="19" x2="5" y2="5"></line>
+                    </svg>
+                </button>
+                
+                <button class="control-btn play-btn" id="playBtn" onclick="togglePlay()">
+                    <svg class="play-icon" id="playIcon" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </button>
+                
+                <button class="control-btn secondary-btn" onclick="skipForward()">
+                    <svg class="control-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                        <line x1="19" y1="5" x2="19" y2="19"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 额外控制：循环和定时 -->
+            <div class="extra-controls">
+                <button class="extra-btn" id="loopBtn" onclick="toggleLoop()">
+                    <svg class="extra-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 2.1l4 4-4 4"></path>
+                        <path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8M7 21.9l-4-4 4-4"></path>
+                        <path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"></path>
+                    </svg>
+                    <span>循环</span>
+                </button>
+                
+                <button class="extra-btn" id="timerBtn" onclick="showTimerModal()">
+                    <svg class="extra-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span id="timerText">定时</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 定时器弹窗 -->
+    <div class="timer-modal" id="timerModal" onclick="closeTimerModal(event)">
+        <div class="timer-content" onclick="event.stopPropagation()">
+            <div class="timer-title">设置自动关闭时间</div>
+            <div class="timer-options">
+                <button class="timer-option" onclick="setTimer(5)">5分钟</button>
+                <button class="timer-option" onclick="setTimer(10)">10分钟</button>
+                <button class="timer-option" onclick="setTimer(15)">15分钟</button>
+                <button class="timer-option" onclick="setTimer(30)">30分钟</button>
+                <button class="timer-option" onclick="setTimer(45)">45分钟</button>
+                <button class="timer-option" onclick="setTimer(60)">60分钟</button>
+            </div>
+            <button class="timer-option" onclick="clearTimer()" style="width: 100%; margin-bottom: 8px; color: #ef4444;">取消定时</button>
+            <button class="timer-close" onclick="closeTimerModal()">关闭</button>
+        </div>
+    </div>
+
+    <!-- 音频元素 -->
+    <audio id="audioPlayer" preload="metadata"></audio>
+
+    <script>
+        // 配置 - 修改这里来设置你的音频文件
+        const config = {
+            audioSrc: 'your-audio-file.mp3', // 替换为你的音频文件路径
+            title: '歌曲标题', // 替换为歌曲标题
+            artist: '艺术家名称' // 替换为艺术家名称
+        };
+
+        // 初始化
+        const audio = document.getElementById('audioPlayer');
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const currentTimeEl = document.getElementById('currentTime');
+        const durationEl = document.getElementById('duration');
+        const loopBtn = document.getElementById('loopBtn');
+        const timerBtn = document.getElementById('timerBtn');
+        const timerText = document.getElementById('timerText');
+        const countdownDisplay = document.getElementById('countdownDisplay');
+        const heartIcon = document.getElementById('heartIcon');
+
+        let isPlaying = false;
+        let isLooping = false;
+        let timerInterval = null;
+        let countdownInterval = null;
+        let timerEndTime = null;
+
+        // 设置音频源
+        audio.src = config.audioSrc;
+        document.getElementById('songTitle').textContent = config.title;
+        document.getElementById('artistName').textContent = config.artist;
+
+        // 播放/暂停切换
+        function togglePlay() {
+            if (isPlaying) {
+                audio.pause();
+                isPlaying = false;
+                // 切换为播放图标
+                playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+            } else {
+                audio.play().catch(e => console.log('播放失败:', e));
+                isPlaying = true;
+                // 切换为暂停图标
+                playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+            }
+        }
+
+        // 更新进度
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                const progress = (audio.currentTime / audio.duration) * 100;
+                progressFill.style.width = progress + '%';
+                progressText.textContent = Math.round(progress) + '%';
+                currentTimeEl.textContent = formatTime(audio.currentTime);
+                durationEl.textContent = formatTime(audio.duration);
+            }
+        });
+
+        // 音频加载完成后更新时间
+        audio.addEventListener('loadedmetadata', () => {
+            durationEl.textContent = formatTime(audio.duration);
+        });
+
+        // 音频结束
+        audio.addEventListener('ended', () => {
+            if (!isLooping) {
+                isPlaying = false;
+                playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+            }
+        });
+
+        // 格式化时间
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        }
+
+        // 点击进度条跳转
+        function seek(event) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const width = rect.width;
+            const percentage = clickX / width;
+            
+            if (audio.duration) {
+                audio.currentTime = percentage * audio.duration;
+            }
+        }
+
+        // 快进/快退
+        function skipForward() {
+            audio.currentTime = Math.min(audio.currentTime + 10, audio.duration);
+        }
+
+        function skipBackward() {
+            audio.currentTime = Math.max(audio.currentTime - 10, 0);
+        }
+
+        // 循环切换
+        function toggleLoop() {
+            isLooping = !isLooping;
+            audio.loop = isLooping;
+            loopBtn.classList.toggle('active', isLooping);
+        }
+
+        // 喜欢切换
+        function toggleLike() {
+            const isLiked = heartIcon.getAttribute('fill') === 'currentColor';
+            if (isLiked) {
+                heartIcon.setAttribute('fill', 'none');
+            } else {
+                heartIcon.setAttribute('fill', 'currentColor');
+            }
+        }
+
+        // 显示定时弹窗
+        function showTimerModal() {
+            document.getElementById('timerModal').classList.add('show');
+        }
+
+        // 关闭定时弹窗
+        function closeTimerModal(event) {
+            if (!event || event.target.id === 'timerModal') {
+                document.getElementById('timerModal').classList.remove('show');
+            }
+        }
+
+        // 设置定时器
+        function setTimer(minutes) {
+            clearTimer();
+            
+            const milliseconds = minutes * 60 * 1000;
+            timerEndTime = Date.now() + milliseconds;
+            
+            // 更新UI
+            timerText.textContent = minutes + '分';
+            timerBtn.classList.add('active');
+            countdownDisplay.classList.add('show');
+            
+            // 关闭弹窗
+            closeTimerModal();
+            
+            // 开始倒计时显示
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
+            
+            // 设置定时器
+            timerInterval = setTimeout(() => {
+                audio.pause();
+                isPlaying = false;
+                playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+                clearTimer();
+            }, milliseconds);
+        }
+
+        // 更新倒计时显示
+        function updateCountdown() {
+            if (!timerEndTime) return;
+            
+            const remaining = Math.max(0, timerEndTime - Date.now());
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            
+            countdownDisplay.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+            
+            if (remaining <= 0) {
+                countdownDisplay.classList.remove('show');
+            }
+        }
+
+        // 清除定时器
+        function clearTimer() {
+            if (timerInterval) {
+                clearTimeout(timerInterval);
+                timerInterval = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            timerEndTime = null;
+            
+            timerText.textContent = '定时';
+            timerBtn.classList.remove('active');
+            countdownDisplay.classList.remove('show');
+            closeTimerModal();
+        }
+
+        // iPhone触摸优化
+        document.addEventListener('touchstart', function() {}, {passive: true});
+        
+        // 防止iPhone上双击缩放
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    </script>
+</body>
+</html>
